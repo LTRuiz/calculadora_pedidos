@@ -617,6 +617,66 @@
     font-size:13px;
     margin-top:4px;
   }
+
+  .ticket-actions{
+    display:flex;
+    gap:8px;
+    padding:14px 26px 0;
+  }
+
+  .ticket-action-btn{
+    flex:1;
+    padding:9px 10px;
+    border-radius:7px;
+    border:1.5px solid var(--line);
+    background:var(--white);
+    color:var(--pitch);
+    font-family:'Inter', sans-serif;
+    font-weight:600;
+    font-size:12.5px;
+    cursor:pointer;
+  }
+
+  .ticket-action-btn:hover{ border-color:var(--gold); }
+
+  .ticket-action-btn.danger{
+    color:var(--red);
+  }
+
+  .ticket-action-btn.danger:hover{ border-color:var(--red); }
+
+  .print-date{
+    display:none;
+    font-size:12px;
+    color:var(--ink-soft);
+    padding:14px 26px 0;
+  }
+
+  @media print{
+    body{
+      background:var(--white);
+      padding:0;
+    }
+    .top, .panel:not(.ticket), .no-print{
+      display:none !important;
+    }
+    .grid{
+      grid-template-columns:1fr;
+      display:block;
+    }
+    .wrap{
+      max-width:100%;
+    }
+    .ticket{
+      box-shadow:none;
+    }
+    .print-date{
+      display:block;
+    }
+    .remove-btn{
+      display:none !important;
+    }
+  }
 </style>
 </head>
 <body>
@@ -701,6 +761,11 @@
         <span>Tu pedido</span>
         <span class="count" id="itemCount">0 ítems</span>
       </div>
+      <div class="ticket-actions no-print">
+        <button class="ticket-action-btn" id="printBtn">🖨️ Descargar / Imprimir</button>
+        <button class="ticket-action-btn danger" id="newOrderBtn">🗑️ Nuevo pedido</button>
+      </div>
+      <div class="print-date" id="printDate"></div>
       <div class="perf"></div>
 
       <div class="items" id="itemsList">
@@ -1015,8 +1080,32 @@
   const parchesInput = document.getElementById('parches');
   const refInput = document.getElementById('ref');
 
+  const CART_STORAGE_KEY = 'calc-pedidos-carrito-v1';
+  const RATE_STORAGE_KEY = 'calc-pedidos-cotizacion-v1';
+
   let cart = [];
   let idCounter = 1;
+
+  try {
+    const savedCart = JSON.parse(localStorage.getItem(CART_STORAGE_KEY) || '[]');
+    if (Array.isArray(savedCart)) {
+      cart = savedCart;
+      idCounter = cart.reduce((max, i) => Math.max(max, i.id || 0), 0) + 1;
+    }
+  } catch(e) {
+    cart = [];
+  }
+
+  try {
+    const savedRate = localStorage.getItem(RATE_STORAGE_KEY);
+    if (savedRate) rateInput.value = savedRate;
+  } catch(e) {}
+
+  function saveCart(){
+    try {
+      localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cart));
+    } catch(e) {}
+  }
 
   document.getElementById('addBtn').addEventListener('click', () => {
     const productId = productSelect.value;
@@ -1057,6 +1146,7 @@
   }
 
   function render(){
+    saveCart();
     const list = document.getElementById('itemsList');
     const countEl = document.getElementById('itemCount');
     const totalQty = cart.reduce((s,i) => s + i.qty, 0);
@@ -1110,8 +1200,24 @@
   }
 
   rateInput.addEventListener('input', () => {
+    try { localStorage.setItem(RATE_STORAGE_KEY, rateInput.value); } catch(e) {}
     refreshAllPriceLabels();
     render();
+  });
+
+  document.getElementById('newOrderBtn').addEventListener('click', () => {
+    if (cart.length === 0) return;
+    const ok = confirm('¿Vaciar el pedido actual y empezar uno nuevo? Esto no se puede deshacer.');
+    if (ok) {
+      cart = [];
+      render();
+    }
+  });
+
+  document.getElementById('printBtn').addEventListener('click', () => {
+    const d = new Date();
+    document.getElementById('printDate').textContent = `Pedido generado el ${d.toLocaleDateString('es-AR')} a las ${d.toLocaleTimeString('es-AR', {hour:'2-digit', minute:'2-digit'})}`;
+    window.print();
   });
 
   refreshAllPriceLabels();
